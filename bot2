@@ -72,7 +72,7 @@ async def process_payment(call: types.CallbackQuery, state: FSMContext):
         description = 'Оплата покупки в магазине игр'
         payload = {'game': data['game'], 'delivery': data['delivery'], 'payment': data['payment']}
         prices = [types.LabeledPrice(label='Игра', amount=100)]
-        provider_token = 'YOUR_PROVIDER_TOKEN'  # replace with your provider token
+        provider_token = '381764678:TEST:58249'  # replace with your provider token
         start_parameter = 'sberbank-payment'
         currency = 'RUB'
 
