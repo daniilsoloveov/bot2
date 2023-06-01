@@ -1,0 +1,99 @@
+from aiogram import Bot, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import Dispatcher, FSMContext
+from aiogram.dispatcher.filters.state import StatesGroup, State
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils import executor
+import requests
+
+
+bot = Bot(token = "5963306703:AAEwm-sz59B3HXe9UYdGJsqjO_TN0_YnIn4")
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
+
+class Games(StatesGroup):
+    game = State()
+    delivery = State()
+    payment = State()
+
+
+
+
+genres_keyboard = InlineKeyboardMarkup(row_width=3)
+genres_keyboard.add(
+    InlineKeyboardButton('Action', callback_data='Action'),
+    InlineKeyboardButton('MMO', callback_data='MMO'),
+    InlineKeyboardButton('RPG', callback_data='RPG')
+)
+
+delivery_keyboard = InlineKeyboardMarkup(row_width=2)
+delivery_keyboard.add(
+    InlineKeyboardButton('Доставка курьером', callback_data='courier'),
+    InlineKeyboardButton('Самовывоз', callback_data='pickup')
+)
+
+payment_keyboard = InlineKeyboardMarkup()
+payment_keyboard.add(
+    InlineKeyboardButton('Сбербанк', callback_data='sberbank'),
+    InlineKeyboardButton('Что то еще', callback_data='other')
+)
+
+
+@dp.message_handler(commands=['start'])
+async def process_start_command(message: types.Message):
+    await message.delete()
+    await message.answer('Здравствуйте!\nВы находитесь в магазине игр\nВыберите жанр игры:', reply_markup=genres_keyboard)
+    await Games.game.set()
+
+
+@dp.callback_query_handler(state=Games.game)
+async def get_games(call: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['game'] = call.data
+    await call.message.edit_text(text=f'Вы успешно выбрали жанр "{call.data}", теперь необходимо выбрать вариант доставки!', reply_markup=delivery_keyboard)
+    await Games.next()
+
+
+@dp.callback_query_handler(state=Games.delivery)
+async def process_delivery(call: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['delivery'] = 'Доставка курьером' if call.data == 'courier' else 'Самовывоз'
+    await call.message.edit_text(text=f'Вы выбрали жанр "{data["game"]}" и вариант доставки "{data["delivery"]}"\n\nОплатить:', reply_markup=payment_keyboard)
+    await Games.next()
+
+@dp.callback_query_handler(state=Games.payment)
+async def process_payment(call: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['payment'] = 'Сбербанк' if call.data == 'sberbank' else 'Что то еще'
+
+    # Create an invoice for Sberbank payment
+    if data['payment'] == 'Сбербанк':
+        title = f'{data["game"]} ({data["delivery"]})'
+        description = 'Оплата покупки в магазине игр'
+        payload = {'game': data['game'], 'delivery': data['delivery'], 'payment': data['payment']}
+        prices = [types.LabeledPrice(label='Игра', amount=100)]
+        provider_token = 'YOUR_PROVIDER_TOKEN'  # replace with your provider token
+        start_parameter = 'sberbank-payment'
+        currency = 'RUB'
+
+        # Send the invoice
+        await bot.send_invoice(
+            chat_id=call.message.chat.id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=provider_token,
+            currency=currency,
+            prices=prices,
+            start_parameter=start_parameter,
+            reply_markup=types.InlineKeyboardMarkup(row_width=2).add(
+                types.InlineKeyboardButton(text='Оплатить', pay=True),
+                types.InlineKeyboardButton(text='Отменить', callback_data='cancel')
+            )
+        )
+    else:
+        await state.finish()
+
+
+if __name__ == '__main__':
+    executor.start_polling(dp)
