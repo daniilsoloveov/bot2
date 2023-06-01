@@ -7,7 +7,7 @@ from aiogram.utils import executor
 import requests
 
 
-bot = Bot(token = "5963306703:AAEwm-sz59B3HXe9UYdGJsqjO_TN0_YnIn4")
+bot = Bot(token = TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
